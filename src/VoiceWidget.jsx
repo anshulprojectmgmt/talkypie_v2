@@ -3,27 +3,58 @@ import { useLocation } from "react-router-dom";
 import { usePorcupine } from "@picovoice/porcupine-react";
 import axios from "axios";
 import Vapi from "@vapi-ai/web";
-import { FiPhoneCall, FiPhoneOff, FiLoader } from "react-icons/fi";
+import {
+  FiPhoneCall,
+  FiPhoneOff,
+  FiLoader,
+  FiMic,
+  FiMicOff,
+} from "react-icons/fi";
 import {
   FaRobot,
   FaExclamationTriangle,
   FaCheckCircle,
   FaVolumeUp,
   FaWifi,
-  
-   
 } from "react-icons/fa";
 // Corrected:
 import { MdWifiOff } from "react-icons/md"; // ✅ correct package
 import { useESP32 } from "./contexts/ESP32Context";
+import { useMicrophone } from "./contexts/MicrophoneContext";
 
 // will initialize Vapi instance once assistant is created
 let vapi;
-let introAudioIntervalID; 
+let introAudioIntervalID;
 const VoiceWidget = () => {
+  // Microphone context
+  const { stream, setStream } = useMicrophone();
+
+  // Microphone mute state
+  const [isMicMuted, setIsMicMuted] = useState(false);
+ 
+  // Toggle microphone mute/unmute
+  const toggleMicrophone = () => {
+    
+
+    // Vapi SDK mute/unmute logic
+    if (typeof vapi !== 'undefined' && vapi && typeof vapi.setMuted === 'function') {
+      vapi.setMuted(!isMicMuted);
+      setIsMicMuted(prev => !prev);
+      console.log(!isMicMuted ? "Microphone muted (Vapi)" : "Microphone unmuted (Vapi)");
+    } else {
+      // fallback: globally mute all active microphone streams`
+      console.warn("Vapi instance not available, falling back to global mic mute.");
+    }
+      
+  };
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const { espCharacteristic, isConnected, connectionLost, acknowledgeConnectionLoss } = useESP32();
+  const {
+    espCharacteristic,
+    isConnected,
+    connectionLost,
+    acknowledgeConnectionLoss,
+  } = useESP32();
 
   const vapiRef = useRef(null);
   const errorAudioIntervalRef = useRef(null);
@@ -48,7 +79,7 @@ const VoiceWidget = () => {
   const [isFormSubmitted, setIsFormSubmitted] = useState(
     queryParams.get("isFormSubmitted") === "true"
   );
-  const customTranscript = queryParams.get('customTranscript') === 'true';
+  const customTranscript = queryParams.get("customTranscript") === "true";
 
   const [wakeWordDetected, setWakeWordDetected] = useState(false);
   const [assistantId, setAssistantId] = useState(null);
@@ -70,17 +101,15 @@ const VoiceWidget = () => {
 
   const DEEPGRAM_API_KEY = "2434d902a6a617075faae7044e92fca628228f9a";
 
-
   // Get VAPI keys from localStorage or URL params
   const vapiPrivateKey =
-    queryParams.get("vapiKey") || localStorage.getItem("vapiKey") ;
+    queryParams.get("vapiKey") || localStorage.getItem("vapiKey");
   const vapiPublicKey =
     queryParams.get("vapiPublicKey") ||
-    localStorage.getItem("vapiPublicKey") || "1f568b16-001f-4f1c-8f34-02a4aa1ea376";
-    
-    
-    // "57bd3c84-dd46-41ce-82ab-2bbe48163d90";
-  
+    localStorage.getItem("vapiPublicKey") ||
+    "1f568b16-001f-4f1c-8f34-02a4aa1ea376";
+
+  // "57bd3c84-dd46-41ce-82ab-2bbe48163d90";
 
   const {
     keywordDetection,
@@ -111,7 +140,7 @@ const VoiceWidget = () => {
   useEffect(() => {
     if (espCharacteristic) {
       console.log("ESP32 characteristic available, setting up event listener");
-      
+
       // Add event listener for ESP32 characteristic value changes
       const handleCharacteristicValueChanged = (event) => {
         const value = new TextDecoder().decode(event.target.value);
@@ -123,17 +152,26 @@ const VoiceWidget = () => {
       };
 
       // Enable notifications and add event listener
-      espCharacteristic.startNotifications().then(() => {
-        espCharacteristic.addEventListener("characteristicvaluechanged", handleCharacteristicValueChanged);
-        console.log("ESP32 characteristic event listener added");
-      }).catch(err => {
-        console.error("Failed to start ESP32 notifications:", err);
-      });
+      espCharacteristic
+        .startNotifications()
+        .then(() => {
+          espCharacteristic.addEventListener(
+            "characteristicvaluechanged",
+            handleCharacteristicValueChanged
+          );
+          console.log("ESP32 characteristic event listener added");
+        })
+        .catch((err) => {
+          console.error("Failed to start ESP32 notifications:", err);
+        });
 
       // Cleanup function
       return () => {
         if (espCharacteristic) {
-          espCharacteristic.removeEventListener("characteristicvaluechanged", handleCharacteristicValueChanged);
+          espCharacteristic.removeEventListener(
+            "characteristicvaluechanged",
+            handleCharacteristicValueChanged
+          );
           console.log("ESP32 characteristic event listener removed");
         }
       };
@@ -184,7 +222,7 @@ const VoiceWidget = () => {
   // Create assistant when component mounts
   // step-1
   const createAssistant = async () => {
-    if (!childName ) {
+    if (!childName) {
       console.log("Missing required parameters");
       setAssistantStatus("failed");
       const errorMsg = "Missing required information for assistant creation.";
@@ -193,23 +231,22 @@ const VoiceWidget = () => {
       return;
     }
 
-
     try {
       setIsCreatingAssistant(true);
       setAssistantError("");
       stopErrorAudioInterval(); // Stop any previous error audio
 
-    let customPrompt = ``;
-      if (interests ) {
+      let customPrompt = ``;
+      if (interests) {
         customPrompt += `Child's Interests & Preferences: ${interests}\n`;
-        }
+      }
       if (currentLearning) {
         customPrompt += `Current Learning in School: ${currentLearning}\n`;
       }
 
-        // https://api-talkypies.vercel.app
+      // https://api-talkypies.vercel.app
       // http://localhost:5000
-      // https://https://talkypie-vapi-backend.onrender.com/vapi/create-assistant  
+      // https://https://talkypie-vapi-backend.onrender.com/vapi/create-assistant
       const response = await axios.post(
         "https://talkypie-vapi-backend.onrender.com/vapi/create-assistant",
         {
@@ -218,7 +255,7 @@ const VoiceWidget = () => {
           vapiKey: vapiPrivateKey,
           prompt,
           toyName,
-          customTranscript
+          customTranscript,
         }
       );
 
@@ -227,7 +264,7 @@ const VoiceWidget = () => {
       const receivedFinalPrompt = response.data.finalPrompt;
 
       // Initialize VAPI with public key for client SDK
-   
+
       vapi = new Vapi(vapiPublicKey);
       setAssistantId(newAssistantId);
       setFinalPrompt(receivedFinalPrompt || "");
@@ -266,20 +303,13 @@ const VoiceWidget = () => {
   // step-2 start the assistant when created
   useEffect(() => {
     if (assistantId && assistantStatus === "created") {
-      
-
       toggleAssistant(); // Start the assistant if it was created successfully
-       
     }
   }, [assistantId, assistantStatus]);
 
   // Auto-create assistant when component mounts
   useEffect(() => {
-    if (
-      isFormSubmitted &&
-      childName &&
-      assistantStatus === "pending"
-    ) {
+    if (isFormSubmitted && childName && assistantStatus === "pending") {
       createAssistant();
     }
   }, [isFormSubmitted, childName, vapiPrivateKey]);
@@ -290,8 +320,6 @@ const VoiceWidget = () => {
       stopErrorAudioInterval();
     };
   }, []);
-
-  
 
   const sendBlinkCommand = async () => {
     try {
@@ -323,7 +351,7 @@ const VoiceWidget = () => {
       console.error("Failed to send off command:", error);
     }
   };
- 
+
   const resetInactivityTimer = () => {
     if (inactivityTimeoutRef.current) {
       clearTimeout(inactivityTimeoutRef.current);
@@ -355,132 +383,152 @@ const VoiceWidget = () => {
     return () => release();
   }, [init, start, release, isFormSubmitted, porcupineKey, assistantStatus]);
 
+
+
   // new setup for deepgram and wake word
 
+  // useEffect to manage wake up audio
+  useEffect(() => {
+    if (
+      !isFormSubmitted ||
+      assistantStatus !== "created" ||
+      mediaDetection ||
+      wakeWordDetected ||
+      isAssistantOn ||
+      isAssistantOnRef.current ||
+      isLoading
+    )
+      return;
 
-// useEffect to manage wake up audio
-useEffect(() => {
-  if (
-    !isFormSubmitted ||
-    assistantStatus !== "created" ||
-    mediaDetection ||
-    wakeWordDetected ||
-    isAssistantOn ||
-    isAssistantOnRef.current ||
-    isLoading
-  ) return;
+    console.log("🔁 Assistant idle — Starting wake audio + Deepgram");
 
-  console.log("🔁 Assistant idle — Starting wake audio + Deepgram");
+    // === Wake up.mp3 Setup ===
+    const audio = new Audio("/wake up.mp3");
+    audio.loop = false;
 
-  // === Wake up.mp3 Setup ===
-  const audio = new Audio("/wake up.mp3");
-  audio.loop = false;
+    const playAudio = () => {
+      if (!audio.paused) return;
+      console.log("🔊 Replaying wake up.mp3...");
+      audio.currentTime = 0;
+      audio.play().catch((e) => console.warn("Audio play failed:", e));
+      wakeUpAudioRef.current = audio;
+    };
 
-  const playAudio = () => {
-    if (!audio.paused) return;
-    console.log("🔊 Replaying wake up.mp3...");
-    audio.currentTime = 0;
-    audio.play().catch((e) => console.warn("Audio play failed:", e));
+    // Play initially
+    audio.play().catch((e) => console.warn("Initial play failed:", e));
     wakeUpAudioRef.current = audio;
-  };
 
-  // Play initially
-  audio.play().catch((e) => console.warn("Initial play failed:", e));
-  wakeUpAudioRef.current = audio;
+    // Loop every 10s until wake word is detected or assistant is turned on
+    const intervalId = setInterval(() => {
+      if (!wakeWordDetected && !isAssistantOnRef.current) {
+        playAudio();
+      }
+    }, 10000);
 
-  // Loop every 10s until wake word is detected or assistant is turned on
-  const intervalId = setInterval(() => {
-    if (!wakeWordDetected && !isAssistantOnRef.current) {
-      playAudio();
-    }
-  }, 10000);
+    // === Deepgram Setup ===
 
-  // === Deepgram Setup ===
-  
-  const initializeDeepgram = async () => {
-  try {
-    // Cleanup
-    // deepgramSocketRef.current?.close?.();
-    // if (mediaRecorderRef.current?.state && mediaRecorderRef.current.state !== "inactive") {
-    //     mediaRecorderRef.current.stop();
-    //   }
-    // mediaStreamRef.current?.getTracks().forEach(t => t.stop());
-
-  
-    // Create WebSocket
-    const socket = new WebSocket(
-      `wss://api.deepgram.com/v1/listen?punctuate=true&language=en`,
-      ["token", DEEPGRAM_API_KEY]
-    );
-    deepgramSocketRef.current = socket;
-
-    socket.onopen = async () => {
+    const initializeDeepgram = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaStreamRef.current = stream;
+        // Cleanup
+        // deepgramSocketRef.current?.close?.();
+        // if (mediaRecorderRef.current?.state && mediaRecorderRef.current.state !== "inactive") {
+        //     mediaRecorderRef.current.stop();
+        //   }
+        // mediaStreamRef.current?.getTracks().forEach(t => t.stop());
 
-        const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
-        mediaRecorderRef.current = recorder;
+        // Create WebSocket
+        const socket = new WebSocket(
+          `wss://api.deepgram.com/v1/listen?punctuate=true&language=en`,
+          ["token", DEEPGRAM_API_KEY]
+        );
+        deepgramSocketRef.current = socket;
 
-        recorder.ondataavailable = e => e.data.size > 0 && socket.readyState === 1 && socket.send(e.data);
-        recorder.start(250);
-        console.log("🎙️ Deepgram listening...");
-      } catch (err) {
-        console.error("Mic error:", err);
-        setErrorMessage("Microphone error: " + err.message);
+        socket.onopen = async () => {
+          try {
+            // if(!stream) {
+            //   const userStream = await navigator.mediaDevices.getUserMedia({
+            //   audio: true,
+            //   });
+            //   setStream(userStream);
+            // }
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaStreamRef.current = stream;
+
+            const recorder = new MediaRecorder(stream, {
+              mimeType: "audio/webm",
+            });
+            mediaRecorderRef.current = recorder;
+
+            recorder.ondataavailable = (e) =>
+              e.data.size > 0 && socket.readyState === 1 && socket.send(e.data);
+            recorder.start(250);
+            console.log("🎙️ Deepgram listening...");
+          } catch (err) {
+            console.error("Mic error:", err);
+            setErrorMessage("Microphone error: " + err.message);
+          }
+        };
+
+        socket.onmessage = ({ data }) => {
+          if (isAssistantOnRef.current) return;
+
+          const transcript =
+            JSON.parse(
+              data
+            )?.channel?.alternatives?.[0]?.transcript?.toLowerCase();
+          const triggers = [
+            "help me",
+            "hi eva",
+            "eva",
+            "hello eva",
+            "hey eva",
+            "hello",
+            "hi coco",
+            "coco",
+            "hello coco",
+          ];
+          if (transcript && triggers.some((w) => transcript.includes(w))) {
+            console.log("🟢 Wake word:", transcript);
+            setWakeWordDetected(true);
+            triggerVapi();
+            socket.close();
+            mediaRecorderRef.current?.stop();
+            mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
+          }
+        };
+
+        socket.onerror = (e) => setErrorMessage("Deepgram error.");
+        socket.onclose = () => console.log("🔌 Deepgram closed");
+      } catch (e) {
+        console.error("Deepgram init failed:", e);
       }
     };
 
-    socket.onmessage = ({ data }) => {
-      if (isAssistantOnRef.current) return;
+    initializeDeepgram();
 
-      const transcript = JSON.parse(data)?.channel?.alternatives?.[0]?.transcript?.toLowerCase();
-      const triggers = ["help me", "hi eva", "eva", "hello eva", "hey eva", "hello" , "hi coco", "coco", "hello coco"];
-      if (transcript && triggers.some(w => transcript.includes(w))) {
-        console.log("🟢 Wake word:", transcript);
-        setWakeWordDetected(true); 
-        triggerVapi();
-        socket.close();
-        mediaRecorderRef.current?.stop();
-        mediaStreamRef.current?.getTracks().forEach(t => t.stop());
+    // === Cleanup Both Audio & Deepgram ===
+    return () => {
+      console.log("🧹 Cleanup Deepgram + Audio");
+      audio.pause?.();
+      clearInterval(intervalId);
+
+      deepgramSocketRef.current?.close?.();
+      if (
+        mediaRecorderRef.current?.state &&
+        mediaRecorderRef.current.state !== "inactive"
+      ) {
+        mediaRecorderRef.current.stop();
       }
+      mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
     };
-
-    socket.onerror = e => setErrorMessage("Deepgram error.");
-    socket.onclose = () => console.log("🔌 Deepgram closed");
-  } catch (e) {
-    console.error("Deepgram init failed:", e);
-  }
-};
-
-
-  initializeDeepgram();
-
-  // === Cleanup Both Audio & Deepgram ===
-   return () => {
-  console.log("🧹 Cleanup Deepgram + Audio");
-  audio.pause?.();
-  clearInterval(intervalId);
-
-  deepgramSocketRef.current?.close?.();
-  if (mediaRecorderRef.current?.state && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-     }
-  mediaStreamRef.current?.getTracks().forEach(t => t.stop());
-};
-
-}, [
-  isFormSubmitted,
-  assistantStatus,
-  mediaDetection,
-  wakeWordDetected,
-  isAssistantOn,
-  isLoading
-]);
-
-
-
-
+  }, [
+    isFormSubmitted,
+    assistantStatus,
+    mediaDetection,
+    wakeWordDetected,
+    isAssistantOn,
+    isLoading,
+  ]);
 
   useEffect(() => {
     if (keywordDetection) {
@@ -489,53 +537,51 @@ useEffect(() => {
     }
   }, [keywordDetection]);
 
-// step-4 
-const introAudio = async () => {
-  console.log("Starting intro audio... before connecting tovapi");
-  
-  // Stop any wake-up audio interval
-  if(wakeUpAudioRef.current) {
-    wakeUpAudioRef.current.pause(); // Pause any ongoing wake-up audio
-    console.log("Paused wake-up audio before starting intro audio.");
-    wakeUpAudioRef.current.currentTime = 0; // Reset the audio to the beginning
-  }
+  // step-4
+  const introAudio = async () => {
+    console.log("Starting intro audio... before connecting tovapi");
 
-  // step-5 
-   const audio = new Audio("/connect.mp3");
-      await audio.play();
-      await new Promise((resolve) => {
-        audio.onended = () => {
-          console.log("waait until intro audio finished");
-          resolve();
-        };
-      })
+    // Stop any wake-up audio interval
+    if (wakeUpAudioRef.current) {
+      wakeUpAudioRef.current.pause(); // Pause any ongoing wake-up audio
+      console.log("Paused wake-up audio before starting intro audio.");
+      wakeUpAudioRef.current.currentTime = 0; // Reset the audio to the beginning
+    }
 
-      // step-6
-      await sendBlinkCommand();
+    // step-5
+    const audio = new Audio("/connect.mp3");
+    await audio.play();
+    await new Promise((resolve) => {
+      audio.onended = () => {
+        console.log("waait until intro audio finished");
+        resolve();
+      };
+    });
 
-      
-      let repeatedAudio;
+    // step-6
+    await sendBlinkCommand();
 
+    let repeatedAudio;
 
-      // Repeat the intro audio every 5 seconds until speech starts
-      introAudioIntervalID = setInterval(() => {
-        repeatedAudio = new Audio(audio.src);
-        repeatedAudio.play();
-        console.log("Playing intro audio...");
-      }, 5000);
+    // Repeat the intro audio every 5 seconds until speech starts
+    introAudioIntervalID = setInterval(() => {
+      repeatedAudio = new Audio(audio.src);
+      repeatedAudio.play();
+      console.log("Playing intro audio...");
+    }, 5000);
 
-      vapi.once("speech-start", async () => {
-        repeatedAudio.pause();
-        console.log("speech-start called only once");
-        console.log("Assistant has started speaking.");
-        clearInterval(introAudioIntervalID);
-        sendOnCommand();
-        console.log("Eva connected. Stopped repeating audio.");
-      });
-}
+    vapi.once("speech-start", async () => {
+      repeatedAudio.pause();
+      console.log("speech-start called only once");
+      console.log("Assistant has started speaking.");
+      clearInterval(introAudioIntervalID);
+      sendOnCommand();
+      console.log("Eva connected. Stopped repeating audio.");
+    });
+  };
 
-// start listening for wake word and toggle assistant when detected
- useEffect(() => {
+  // start listening for wake word and toggle assistant when detected
+  useEffect(() => {
     if (
       (mediaDetection || wakeWordDetected) &&
       isFormSubmitted &&
@@ -545,11 +591,10 @@ const introAudio = async () => {
         console.log("Assistant is already on, no need to start again.");
         return;
       }
-      
+
       setIsLoading(true);
       // direct call toggleAssistant and inside it call introAudio fun
       toggleAssistant();
-
 
       return () => {
         // clearInterval(introAudioIntervalID);
@@ -557,8 +602,6 @@ const introAudio = async () => {
     }
   }, [wakeWordDetected, isFormSubmitted, mediaDetection, assistantStatus]);
 
-
-  
   useEffect(() => {
     if (!isFormSubmitted) return;
 
@@ -602,7 +645,6 @@ const introAudio = async () => {
 
     setIsLoading(true);
     try {
-
       const call = await vapi.start(assistantId);
       console.log("Call started:", call);
       setIsLoading(false);
@@ -612,15 +654,14 @@ const introAudio = async () => {
       // For listening assistants talking and listning states
 
       vapi.on("speech-start", () => {
-      sendOnCommand();
+        sendOnCommand();
       });
 
       vapi.on("speech-end", () => {
-      sendBlinkCommand();
-     });
+        sendBlinkCommand();
+      });
 
-
-       // when the assistant ended the call implicitly, we have to manually perform end call operations
+      // when the assistant ended the call implicitly, we have to manually perform end call operations
       vapi.once("call-end", () => {
         console.log(
           "Call ended event received",
@@ -649,31 +690,36 @@ const introAudio = async () => {
   const endCallProcessing = async () => {
     console.log("End call processing started..... before stopping Vapi");
     try {
-       
       const audio = new Audio("/disconnect.mp3");
-      await  audio.play();
+      await audio.play();
       await new Promise((resolve) => {
         audio.onended = () => {
           console.log("wait until disconnect audio finished");
           resolve();
         };
-      })
+      });
 
       await sendOffCommand();
     } catch (error) {
       console.error("Error processing end call:", error);
-      
     }
   };
 
   useEffect(() => {
-
     return () => {
-     console.log("Cleaning up on unmount, stopping Vapi and sending off command: ", isAssistantOnRef.current,"|| ", isAssistantOn);
-      if(isAssistantOnRef.current) {
-        console.log("Cleaning up on unmount, stopping Vapi and sending off command");
+      console.log(
+        "Cleaning up on unmount, stopping Vapi and sending off command: ",
+        isAssistantOnRef.current,
+        "|| ",
+        isAssistantOn
+      );
+      if (isAssistantOnRef.current) {
+        console.log(
+          "Cleaning up on unmount, stopping Vapi and sending off command"
+        );
         toggleAssistant(); // Ensure assistant is turned off}
-    }}
+      }
+    };
   }, []);
 
   // step-3 toggle assistant on/off
@@ -682,12 +728,15 @@ const introAudio = async () => {
 
     if (isAssistantOnRef.current) {
       setIsLoading(true);
+       vapi.setMuted(false);
+      setIsMicMuted(false);
       vapi.stop();
-       setIsAssistantOn(false);
+      setIsAssistantOn(false);
       isAssistantOnRef.current = false;
+      
       await endCallProcessing();
       console.log("call disconnected");
-     
+
       setIsLoading(false);
       setWakeWordDetected(false);
       setMediaDetect(false);
@@ -718,16 +767,15 @@ const introAudio = async () => {
           <div className="flex items-center justify-center">
             <MdWifiOff className="w-12 h-12 text-red-500" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900">
-            Connection Lost
-          </h2>
+          <h2 className="text-2xl font-bold text-gray-900">Connection Lost</h2>
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <p className="text-red-700 text-sm mb-3">
-              Your ESP32 connection was lost due to a page reload. Please reconnect your Talkypie device to continue.
+              Your ESP32 connection was lost due to a page reload. Please
+              reconnect your Talkypie device to continue.
             </p>
             <div className="flex flex-col gap-2">
               <button
-                onClick={() => window.location.href = '/permissions'}
+                onClick={() => (window.location.href = "/permissions")}
                 className="w-full py-2 px-4 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-all duration-300"
               >
                 Reconnect Talkypie
@@ -879,26 +927,55 @@ const introAudio = async () => {
           </div>
 
           <div className="flex justify-center">
-            <button
-              
-              onClick={toggleAssistant}
-              className={`rounded-full p-4 text-white shadow-lg transition-transform duration-300 ease-in-out ${
-                isAssistantOn
-                  ? "bg-red-600 hover:bg-red-700"
-                  : isLoading
-                  ? "bg-yellow-500"
-                  : "bg-green-600 hover:bg-green-700"
-              }`}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <FiLoader className="w-8 h-8 animate-spin" />
-              ) : isAssistantOn ? (
-                <FiPhoneOff className="w-8 h-8" />
-              ) : (
-                <FiPhoneCall className="w-8 h-8 animate-pulse" />
+            <div className="flex gap-4">
+              <button
+                onClick={toggleAssistant}
+                className={`rounded-full p-4 text-white shadow-lg transition-transform duration-300 ease-in-out ${
+                  isAssistantOn
+                    ? "bg-red-600 hover:bg-red-700"
+                    : isLoading
+                    ? "bg-yellow-500"
+                    : "bg-green-600 hover:bg-green-700"
+                }`}
+                disabled={isLoading}
+                title={isAssistantOn ? "Disconnect" : "Connect"}
+              >
+                {isLoading ? (
+                  <FiLoader className="w-8 h-8 animate-spin" />
+                ) : isAssistantOn ? (
+                  <FiPhoneOff className="w-8 h-8" />
+                ) : (
+                  <FiPhoneCall className="w-8 h-8 animate-pulse" />
+                )}
+              </button>
+              {isAssistantOn &&  (
+                <button
+                onClick={toggleMicrophone}
+                className={`rounded-full p-4 shadow-lg transition-transform duration-300 ease-in-out ${
+                  !stream
+                    ? "bg-gray-400 text-gray-200 cursor-not-allowed"
+                    : isMicMuted
+                    ? "bg-red-600 text-white hover:bg-red-700"
+                    : "bg-blue-600 text-white hover:bg-blue-700"
+                }`}
+                disabled={!stream}
+                title={
+                  !stream
+                    ? "Microphone unavailable"
+                    : isMicMuted
+                    ? "Unmute Microphone"
+                    : "Mute Microphone"
+                }
+              >
+                {isMicMuted ? (
+                  <FiMicOff className="w-8 h-8" />
+                ) : (
+                  <FiMic className="w-8 h-8" />
+                )}
+              </button>
               )}
-            </button>
+              
+            </div>
           </div>
         </div>
       </div>
@@ -908,11 +985,14 @@ const introAudio = async () => {
         <div className="bg-white rounded-xl shadow-xl p-6">
           <div className="flex items-center gap-3 mb-4">
             <FaRobot className="text-2xl text-indigo-600" />
-            <h2 className="text-xl font-bold text-gray-900">AI Assistant Instructions</h2>
+            <h2 className="text-xl font-bold text-gray-900">
+              AI Assistant Instructions
+            </h2>
           </div>
           <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-4 border border-indigo-200">
             <p className="text-sm text-gray-600 mb-2 font-medium">
-              This is how your AI assistant has been configured to interact with {childName}:
+              This is how your AI assistant has been configured to interact with{" "}
+              {childName}:
             </p>
             <div className="bg-white rounded-lg p-4 border border-indigo-100">
               <pre className="text-sm text-gray-800 whitespace-pre-wrap font-mono leading-relaxed">
@@ -920,7 +1000,6 @@ const introAudio = async () => {
               </pre>
             </div>
           </div>
-
         </div>
       )}
     </div>
