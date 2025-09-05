@@ -1,0 +1,164 @@
+General reset and styling
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Roboto', sans-serif;
+  background: linear-gradient(135deg, #eef2f3, #8fa3b6);
+  color: #2c3e50;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+/* Form container styling */
+#input-form {
+  background: linear-gradient(135deg, #ffffff, #f8f9fa);
+  border-radius: 15px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  max-width: 600px;
+  width: 100%;
+  padding: 40px;
+  margin: auto;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+#input-form:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+}
+
+/* Header styling */
+h2 {
+  color: #2c3e50;
+  font-size: 28px;
+  margin-bottom: 25px;
+  text-align: center;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* Form elements */
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px; /* Add consistent spacing between form elements */
+}
+
+label {
+  font-weight: 600;
+  font-size: 16px;
+  color: #34495e;
+  margin-bottom: 8px;
+  text-transform: capitalize;
+}
+
+input,
+select,
+textarea {
+  padding: 15px;
+  border: 1px solid #dfe6e9;
+  border-radius: 10px;
+  font-size: 16px;
+  background-color: #f9f9f9;
+  color: #2c3e50;
+  width: 100%; /* Ensure all fields take full width */
+  transition: all 0.3s ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: #6c8cbf;
+  background-color: #ffffff;
+  outline: none;
+  box-shadow: 0 0 8px rgba(108, 140, 191, 0.5);
+}
+
+textarea {
+  resize: none;
+  min-height: 120px;
+}
+
+/* Inline input group for aligned fields */
+.inline-group {
+  display: flex;
+  gap: 20px;
+}
+
+.inline-group > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Button styling */
+button {
+  background: linear-gradient(135deg, #6c8cbf, #506f9b);
+  color: white;
+  padding: 15px 25px;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.3s ease;
+}
+
+button:hover {
+  background: linear-gradient(135deg, #506f9b, #40577e);
+}
+
+button:active {
+  transform: scale(0.97);
+  box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.2);
+}
+
+button:disabled {
+  background-color: #bdc3c7;
+  cursor: not-allowed;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  #input-form {
+    padding: 30px;
+  }
+
+  h2 {
+    font-size: 24px;
+  }
+
+  .inline-group {
+    flex-direction: column;
+    gap: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  body {
+    padding: 10px;
+  }
+
+  #input-form {
+    width: 100%;
+    padding: 20px;
+  }
+
+  h2 {
+    font-size: 20px;
+  }
+
+  button {
+    font-size: 14px;
+    padding: 12px 20px;
+  }
+}
