@@ -3,12 +3,14 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { FaMicrophone, FaBluetooth, FaCheckCircle, FaTimesCircle, FaExclamationTriangle, FaSpinner } from 'react-icons/fa';
 import { MdBluetooth } from 'react-icons/md';
 import { useESP32 } from '../contexts/ESP32Context';
+import { useMicrophone } from '../contexts/MicrophoneContext';
 
 const PermissionsCheck = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const { setCharacteristic, isConnected } = useESP32();
+  const { setStream } = useMicrophone();
   
   const [microphoneStatus, setMicrophoneStatus] = useState('pending'); // pending, granted, denied
   const [esp32Status, setEsp32Status] = useState('pending'); // pending, connected, failed
@@ -40,7 +42,7 @@ const PermissionsCheck = () => {
       setErrorMessage('');
       
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(track => track.stop()); // Stop the stream immediately
+      setStream(stream); // Store the stream in context
       
       setMicrophoneStatus('granted');
       console.log('Microphone permission granted');
