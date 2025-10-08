@@ -248,7 +248,7 @@ const VoiceWidget = () => {
       // http://localhost:5000
       // https://https://talkypie-vapi-backend.onrender.com/vapi/create-assistant
       const response = await axios.post(
-        "https://talkypie-vapi-backend.onrender.com/vapi/create-assistant",
+        "https://talkypie-vapi-backend.vercel.app/vapi/create-assistant",
         {
           childName,
           customPrompt,
