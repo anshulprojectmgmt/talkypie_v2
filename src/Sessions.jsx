@@ -10,7 +10,7 @@ export default function SessionsPage() {
       try {
         // https://talkypie-vapi-backend.vercel.app/
         // https://talkypie-vapi-backend.onrender.com/
-        const res = await fetch("https://talkypie-vapi-backend.vercel.app/vapi/sessions"); // Replace with your API URL
+        const res = await fetch("https://talkypie-vapi-backend.onrender.com/vapi/sessions"); // Replace with your API URL
         const data = await res.json();
         setSessions(data.callData);
         setTotals({
